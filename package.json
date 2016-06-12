@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "devDependencies": {
+    "async-series": "0.0.1",
+    "async.map": "^0.5.2",
+    "defence-cli": "^2.0.0",
+    "level-exists": "^2.0.1",
+    "level-lock": "^1.0.1",
+    "levelup": "^1.3.2",
+    "markdown-table": "^0.4.0",
+    "memdown": "^1.2.0"
+  },
+  "scripts": {
+    "test": "for file in *.md ; do echo \"$file\" ; defence \"$file\" | node ; done"
+  }
+}
