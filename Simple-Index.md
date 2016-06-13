@@ -2,7 +2,8 @@
 
 ## Introduction
 
-In this example, we'll store some very simple blog-post data in a [LevelUP] data store.
+In this example, we'll store some very simple blog-post data in a [LevelUP]
+data store.
 
 [LevelUP]: https://www.npmjs.com/package/levelup
 
@@ -30,8 +31,8 @@ We will want to be able to query our data store for:
    index pages.
 
 3. An arbitrary number of posts in date order, oldest-first or newest-first,
-   for an archive view.  Title, date, author, and a way to link to the
-   full text suffice.
+   for an archive view.  Title, date, author, and a way to link to the full
+   text suffice.
 
 In relational-database terms, we want to index our posts by author and date.
 
@@ -76,21 +77,20 @@ var levelup = require('levelup')
 var memdown = require('memdown')
 ```
 
-LevelUP is the key package for LevelUP data stores.  It provides the
-abstract (or "generic") interface to data stores that follow its rules.
+LevelUP is the key package for LevelUP data stores.  It provides the abstract
+(or "generic") interface to data stores that follow its rules.
 
 One of those data stores in `memdown`, which stores all data in memory.
-`memdown` is a great choice when all the data your program will handle
-can fit in memory, and for testing.
+`memdown` is a great choice when all the data your program will handle can
+fit in memory, and for testing.
 
 ```javascript
 var exists = require('level-exists')
 var lock = require('level-lock')
 ```
 
-LevelUP intentionally provides a very sparse API.  These packages
-provide some additional, convenient APIs on top of that API,
-explained later.
+LevelUP intentionally provides a very sparse API.  These packages provide
+some additional, convenient APIs on top of that API, explained later.
 
 ## Initializing a LevelUP Data Store
 
@@ -98,9 +98,8 @@ explained later.
 var options = { }
 ```
 
-The `levelup` package exports a function for creating LevelUP data
-store instances.  It takes an `Object` argument of configuration
-options.
+The `levelup` package exports a function for creating LevelUP data store
+instances.  It takes an `Object` argument of configuration options.
 
 ```javascript
 options.db = memdown
@@ -180,6 +179,7 @@ structured to meet our needs.
 function putPost (level, post, callback) {
   var postKey = [ 'posts', post.slug ]
 ```
+
 Since post slugs must be unique, we need to check whether we already have
 a key-value pair for a post with the same slug.  We can do so by reading
 whether our LevelUP instance has a value for the post key, and only writing
@@ -251,8 +251,8 @@ One way to do so is to prefix keys for different kinds of queries.
             },
 ```
 
-This put operation gives us records with keys like `by/$author/$slug` and
-space saving placeholder values.  As we'll see later, we can use the
+This put operation gives us records with keys like `by/$author/$slug`
+and space saving placeholder values.  As we'll see later, we can use the
 sort-order of characters in these keys to craft a range of keys that include
 just those beginning with a prefix like `by/$author/`.
 
@@ -273,11 +273,12 @@ For:
 Against:
 
 1. To get the data we need, we must now run multiple queries, in two stages.
-   First we stream the keys that point to the posts we need.  This is more complex.
+   First we stream the keys that point to the posts we need.  This is more
+   complex.
 
 2. The more complex query will also be slower.  In particular, the second-stage
-   `.get` calls don't play to LevelDB's strength in high-performance
-   sequential reads, or reads that involve multiple keys in a row.
+   `.get` calls don't play to LevelDB's strength in high-performance sequential
+   reads, or reads that involve multiple keys in a row.
 
 3. If we expect to support deleting posts entirely, we may encounter situations
    where a post is listed in the first stage of our query, but deleted by
@@ -455,7 +456,6 @@ function putAndQueryData (level) {
 ```
 
 At this point, the key-value data in our LevelUP instance looks a bit like:
-
 
 | Key                   | Value                                                                                              |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
