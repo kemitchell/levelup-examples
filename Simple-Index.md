@@ -153,8 +153,6 @@ the argument is ignored.
 
 ```javascript
   exists.install(level)
-  putAndQueryData(level)
-})
 ```
 
 LevelUP's API provides `.get(key, callback)`, which will call back with an
@@ -170,6 +168,15 @@ certain key would involve a bit of boilerplate.  `level-exists` provides a
 "plug-in" method for LevelUP stores, built on top of `.createReadStream`,
 that is much more terse and intuitive.  Here, we install it onto our LevelUP
 instance.
+
+```javascript
+  putAndQueryData(level)
+})
+```
+
+We will store and query data in the LevelUP instance a bit later.  But for
+now, we turn to some helper functions that show how keys are queries are
+structured to meet our needs.
 
 ## Storing Posts
 
