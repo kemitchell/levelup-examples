@@ -399,6 +399,8 @@ Once we have all the slugs, we do a `.get` for corresponding post data.
 }
 ```
 
+Just in case.
+
 ## Finding Oldest Posts
 
 ```javascript
