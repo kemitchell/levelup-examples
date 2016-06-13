@@ -24,11 +24,14 @@ the post.  Every post slug will be unique.
 Each post will also have an author and an ISO-8601 (YYYY-MM-DD) date.
 We will want to be able to query our data store for:
 
-1. The content of any post.
+1. The complete content of any post, to display post pages.
 
-2. A list of posts by any author.
+2. A list of posts by any author, with complete text, to list on author
+   index pages.
 
-3. An arbitrary number of posts in date order, oldest-first or newest-first.
+3. An arbitrary number of posts in date order, oldest-first or newest-first,
+   for an archive view.  Title, date, author, and a way to link to the
+   full text suffice.
 
 In relational-database terms, we want to index our posts by author and date.
 
@@ -60,8 +63,8 @@ var done = false
 ```
 
 The code in this file's fenced code blocks example can be run like a test.
-You can pull extract is automatically with `npm install --global defence-cli
-&& defence Simple-Index.md` and run it for yourself with `defence file | node`.
+You can extract is automatically with `npm install --global defence-cli &&
+defence Simple-Index.md` and run it for yourself with `defence file | node`.
 
 The `done` flag is set only when the last of our asynchronous callbacks
 finishes, so we can test that everything was invoked as expected.
@@ -223,11 +226,11 @@ in memory.
 At this point we know that there is no key for the slug and we have locked
 the right to create it.
 
-A naive way to find posts by a specific author, or to find the newest, would
-be to stream every key-value pair storing a post and pick out (and sort)
-those meeting our criteria.  That's a perfectly fine approach when there
-won't be many posts to store or requests to find them.  You may be surprised
-how many real use cases can be plenty well served by that kind of approach,
+A naive way to find posts by a specific author, or to find the newest,
+would be to stream every key-value pair storing a post and pick out those
+meeting our criteria.  That's a perfectly fine approach when there won't
+be many posts to store or requests to find them.  You may be surprised how
+many real use cases can be plenty well served by that kind of approach,
 especially when using high-performance storage back-ends.
 
 However, when data is plentiful, the storage back-end sluggish, or performance
@@ -241,56 +244,90 @@ One way to do so is to prefix keys for different kinds of queries.
 
 ```javascript
           var batch = [
-            { type: 'put', key: postKey, value: post },
+            {
+              type: 'put',
+              key: [ 'by', post.author, post.slug ],
+              value: ''
+            },
+```
+
+This put operation gives us records with keys like `by/$author/$slug` and
+space saving placeholder values.  As we'll see later, we can use the
+sort-order of characters in these keys to craft a range of keys that include
+just those beginning with a prefix like `by/$author/`.
+
+Empty placeholder values embody a trade-off.
+
+For:
+
+1. They save storage space.
+
+2. Since we can fetch the full data for any post with its slug, the keys
+   of these records give us all we need to make additional `.get` requests
+   for the data we need.
+
+3. If we expect to support post title and text editing, we need only change
+   these values in the record holding post data.  We won't have to make
+   identical changes to the index record value.
+
+Against:
+
+1. To get the data we need, we must now run multiple queries, in two stages.
+   First we stream the keys that point to the posts we need.  This is more complex.
+
+2. The more complex query will also be slower.  In particular, the second-stage
+   `.get` calls don't play to LevelDB's strength in high-performance
+   sequential reads, or reads that involve multiple keys in a row.
+
+3. If we expect to support deleting posts entirely, we may encounter situations
+   where a post is listed in the first stage of our query, but deleted by
+   the time we make our `.get` for the post.
+
+```javascript
+            {
+              type: 'put',
+              key: [ 'date', post.date, post.slug ],
+              value: {
+                title: post.title,
+                date: post.date,
+                author: post.author,
+                slug: post.slug
+              }
+            },
+```
+
+This index record enables searching by date.  Since LevelUP sorts key-value
+pairs by key in lexicographic order, and ISO-8601 (YYYY-MM-DD) dates in
+lexicographic order are also in date order, these keys will be stored
+in date order.  We'll stream these keys to find the oldest posts in our
+LevelUP instance.
+
+Again, we face a trade-off in deciding what to store in the index record value.
+We could again use placeholder values and a two-stage query.  In this case,
+since the data we need to display for the query is quite limited and the main
+space concern is probably post text, copying the needed properties works well.
+
+```javascript
+            { type: 'put', key: postKey, value: post }
+          ]
 ```
 
 This put operation stores the whole post object in a key based on the post's
 unique slug.
 
 ```javascript
-            { type: 'put', key: [ 'by', post.author, post.slug ], value: '' },
-```
-
-This put operation gives us records with keys like `by/$author/$slug` and
-empty-string values.  As we'll see later, we can use the sort-order of
-characters in these keys to craft a range of keys that include just those
-begin with a prefix like `by/$author/`.  The third component of those keys, the
-slug, acts like a pointer.  Once we have those slugs, we can use them to
-fetch the post objects, much like a relational database might join on a foreign key.
-
-Note that the empty-string value embodies a trade-off.  We might instead
-choose to copy the entire post object into this index record's value, as well.
-A short placeholder value saves some space in the underlying store.  Copies of
-the data would let us do the queries in one step, rather than first reading
-index records and then fetching the post data records they refer to.
-
-The text of our example posts is very short, but real posts may be quite long,
-perhaps including Base64-encoded image or other data.  So this example avoids
-storing unnecessary copies of post text.
-
-```javascript
-            { type: 'put', key: [ 'date', post.date, post.slug ], value: '' }
-          ]
-```
-
-This index record enables searching by date.  Since LevelUP sorts key-value
-pairs by key in lexicographic order and ISO-8601 (YYYY-MM-DD) dates in
-lexicographic order are in date order, these keys will be stored in date order.
-We'll stream these keys to find the oldest posts in our LevelUP instance.
-
-```javascript
           level.batch(batch, function (error) {
 ```
 
-To guarantee that a crash or other issue won't leave our LevelUP store in
-an inconsistent state where it has the key-value pair for the post data
-itself, but not the key-value pairs used to index the post, we submit the
-`put` operations for the post data and indices as a batch.  Either all the
-operations in this batch will succeed, or all will fail.
+To guarantee that our LevelUP instance won't end up with the key-value pair
+for the post data itself, but not all the index records that go with it,
+say due to a crash, we submit the `put` operations for the post data and
+indices as a batch.  Either all the operations in this batch will succeed,
+or all will fail.
 
-Note that we can't do `get` operations in a batch, nor can we tell LevelUP to
-write key-value pairs only if the keys don't already exist.  (This operation
-is sometime called an "upsert".)  Rather, we have guarantee that atomicity
+Note that we can't do `.get` operations in a batch, nor can we tell LevelUP to
+write key-value pairs only if the keys don't already exist.  This operation
+is sometime called an "upsert".  Rather, we have guarantee that atomicity
 ourselves, by locking before reading to check for the key and unlocking one
 we've written.
 
@@ -335,11 +372,11 @@ have LevelUP stream only keys.  Some storage back-ends, in particular the most
 popular, LevelDB, can provide just keys more efficiently than keys with values.
 
 ```javascript
-  var postSlugs = [ ]
+  var slugs = [ ]
   level.createReadStream(options)
-    .on('data', function (indexKey) {
-      var slug = indexKey[2]
-      postSlugs.push(slug)
+    .on('data', function (key) {
+      var slug = key[2]
+      slugs.push(slug)
     })
 ```
 
@@ -347,7 +384,7 @@ We gather the third key component, the slug, from each matching index key.
 
 ```javascript
     .once('end', function () {
-      map(postSlugs, getPost, callback)
+      map(slugs, getPost, callback)
       function getPost (slug, done) {
         var key = [ 'posts', slug ]
         level.get(key, done)
@@ -358,9 +395,7 @@ We gather the third key component, the slug, from each matching index key.
 Once we have all the slugs, we do a `.get` for corresponding post data.
 
 ```javascript
-    .once('error', function (error) {
-      callback(error)
-    })
+    .once('error', callback)
 }
 ```
 
@@ -371,8 +406,8 @@ function oldestPosts (level, howMany, callback) {
   var options = {
     gte: [ 'date', '' ],
     lte: [ 'date', '~' ],
-    keys: true,
-    values: false,
+    keys: false,
+    values: true,
     limit: howMany,
     reverse: true
   }
@@ -383,27 +418,23 @@ of the fact that keys will stream in sorted order.  Since the ISO-8601 dates
 in these key names put them in order, we use `reverse` to get the oldest,
 rather than newest.  The `limit` option works much the same as SQL's `LIMIT`.
 
+Note that since all the information we need is in record values, we need
+not stream keys.
+
 ```javascript
-  var postSlugs = [ ]
+  var values = [ ]
   level.createReadStream(options)
-    .on('data', function (indexKey) {
-      var slug = indexKey[2]
-      postSlugs.push(slug)
+    .on('data', function (value) {
+      values.push(value)
     })
     .once('end', function () {
-      map(postSlugs, getPost, callback)
-      function getPost (slug, done) {
-        var key = [ 'posts', slug ]
-        level.get(key, done)
-      }
+      callback(null, values)
     })
-    .once('error', function (error) {
-      callback(error)
-    })
+    .once('error', callback)
 }
 ```
 
-This code is identical to code in `postsBy` above.  It could be pulled out.
+Note that there is just one, streaming query.
 
 ## Step by Step
 
@@ -423,14 +454,15 @@ function putAndQueryData (level) {
 
 At this point, the key-value data in our LevelUP instance looks a bit like:
 
+
 | Key                   | Value                                                                                              |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
 | by/ana/ana-1          | ""                                                                                                 |
 | by/ana/ana-2          | ""                                                                                                 |
 | by/bob/bob-1          | ""                                                                                                 |
-| date/2016-01-01/ana-1 | ""                                                                                                 |
-| date/2016-01-02/bob-1 | ""                                                                                                 |
-| date/2016-01-03/ana-2 | ""                                                                                                 |
+| date/2016-01-01/ana-1 | {"title":"Ana's First Post","date":"2016-01-01","author":"ana","slug":"ana-1"}                     |
+| date/2016-01-02/bob-1 | {"title":"Bob, Too!","date":"2016-01-02","author":"bob","slug":"bob-1"}                            |
+| date/2016-01-03/ana-2 | {"title":"Ana's Second Post","date":"2016-01-03","author":"ana","slug":"ana-2"}                    |
 | posts/ana-1           | {"title":"Ana's First Post","date":"2016-01-01","author":"ana","slug":"ana-1","text":"Posted!"}    |
 | posts/ana-2           | {"title":"Ana's Second Post","date":"2016-01-03","author":"ana","slug":"ana-2","text":"More Ana."} |
 | posts/bob-1           | {"title":"Bob, Too!","date":"2016-01-02","author":"bob","slug":"bob-1","text":"Bob write!"}        |
@@ -456,9 +488,21 @@ or three pairs per post.  Of those:
       function (done) {
         oldestPosts(level, 2, function (error, posts) {
           assert.ifError(error)
-          assert.deepEqual(posts, [ thirdByAna, secondByBob ])
+          assert.deepEqual(
+            posts,
+            [
+              withoutTitle(thirdByAna),
+              withoutTitle(secondByBob)
+            ]
+          )
           done()
         })
+        function withoutTitle (post) {
+          var copy = { }
+          Object.assign(copy, post)
+          delete copy.text
+          return copy
+        }
       }
     ],
 ```
