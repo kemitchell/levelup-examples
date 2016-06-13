@@ -485,3 +485,6 @@ process.on('exit', function () {
   process.stdout.write('Tests passed.\n')
 })
 ```
+
+This code ensures that all our asynchronous callbacks were triggered as
+expected, and therefore all our assertions were checked.
