@@ -500,8 +500,7 @@ or three pairs per post.  Of those:
           done()
         })
         function withoutTitle (post) {
-          var copy = { }
-          Object.assign(copy, post)
+          var copy = Object.assign({ }, post)
           delete copy.text
           return copy
         }
