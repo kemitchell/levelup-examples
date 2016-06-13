@@ -353,7 +353,7 @@ popular, LevelDB, can provide just keys more efficiently than keys with values.
 We gather the third key component, the slug, from each matching index key.
 
 ```javascript
-    .on('end', function () {
+    .once('end', function () {
       map(postSlugs, getPost, callback)
       function getPost (slug, done) {
         var key = [ 'posts', slug ]
@@ -365,7 +365,7 @@ We gather the third key component, the slug, from each matching index key.
 Once we have all the slugs, we do a `.get` for corresponding post data.
 
 ```javascript
-    .on('error', function (error) {
+    .once('error', function (error) {
       callback(error)
     })
 }
@@ -397,14 +397,14 @@ rather than newest.  The `limit` option works much the same as SQL's `LIMIT`.
       var slug = indexKey[2]
       postSlugs.push(slug)
     })
-    .on('end', function () {
+    .once('end', function () {
       map(postSlugs, getPost, callback)
       function getPost (slug, done) {
         var key = [ 'posts', slug ]
         level.get(key, done)
       }
     })
-    .on('error', function (error) {
+    .once('error', function (error) {
       callback(error)
     })
 }
