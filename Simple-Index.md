@@ -89,15 +89,6 @@ LevelUP intentionally provides a very sparse API.  These packages
 provide some additional, convenient APIs on top of that API,
 explained later.
 
-```javascript
-var map = require('async.map')
-var series = require('async-series')
-```
-
-LevelUP's interface uses callbacks, much like Node.js' core modules.
-These packages export useful functions for invoking multiple
-callback-style functions in parallel and in series.
-
 ## Initializing a LevelUP Data Store
 
 ```javascript
@@ -419,6 +410,9 @@ This code is identical to code in `postsBy` above.  It could be pulled out.
 Here we put our functions to work:
 
 ```javascript
+var map = require('async.map')
+var series = require('async-series')
+
 function putAndQueryData (level) {
   series(
     [
