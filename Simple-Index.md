@@ -2,7 +2,9 @@
 
 ## Introduction
 
-In this example, we'll store some very simple blog-post data in a LevelUP data store.
+In this example, we'll store some very simple blog-post data in a [LevelUP] data store.
+
+[LevelUP]: https://www.npmjs.com/package/levelup
 
 Here's an example of the kind of data we'll store for each post:
 
